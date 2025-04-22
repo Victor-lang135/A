@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RPG de Texto</title>
+  <style>
+  .comum {
+  color: #ccc;
+}
+
+.incomum {
+  color: #3cb371; /* verde médio */
+}
+
+.raro {
+  color: #1e90ff; /* azul */
+}
+
+.lendário {
+  color: #ff8c00; /* laranja ouro */
+  font-weight: bold;
+}
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      color: #fff;
+      padding: 20px;
+    }
+
+    button {
+      display: inline-block;
+      margin: 10px 5px;
+      padding: 10px;
+      background: #333;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      height: 12%;
+      width: 97%;
+    }
+
+    button:hover {
+      background: #555;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    div {
+      border: #555 solid;
+      padding: 10px;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+    }
+    
+    .column {
+      flex-direction: column;
+    }
+    
+    .save {
+      height: 15%;
+      justify-content: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="column" id="interface">
+  <div id="texto"></div>
+  <button onclick="start()" id="start" type="button">Start</button>
+  <div id="menu" class="hidden">
+    <button onclick="explorar()" id="zona1">Explorar ao norte</button>
+    <button onclick="abrigo()" id="abrigo1">Procurar abrigo</button>
+  </div>
+  <div id="menu2" class="hidden">
+    <button onclick="zona2()" id="explorar">
+      Continuar explorando
+    </button>
+    <button onclick="retornar()" id="return">
+      Voltar
+    </button>
+  </div>
+  <div id="zona2" class="hidden">
+    <button onclick="explorar2()" id="explorar2">
+      Explorar o oeste
+    </button>
+    <button onclick="abrigo2()" id="abrigo2">
+      Procurar abrigo
+    </button>
+  </div>
+  <div id="opcoes" class="hidden">
+    <button onclick="combater()">Combater o monstro</button>
+    <button onclick="magias()" type="submit">Magias</button>
+    <button onclick="fugir()">Fugir para a floresta</button>
+  </div>
+    <div id="opcoes2" class="hidden">
+    <button onclick="combater()">Combater o monstro</button>
+    <button onclick="magias2()" type="submit">Magias</button>
+    <button onclick="fugir2()">Fugir para a floresta</button>
+  </div>
+  <div class="save"><button onclick="salvarPersonagem()">
+    Salvar
+  </button><button onclick="carregarPersonagem()">
+    Carregar
+  </button><button onclick="clear()" style="width: 120%;">Limpar Saves</button>
+  </div>
+ </div>
+  <script>
+    const texto = document.getElementById("texto");
+    const opcoes = document.getElementById("opcoes");
+    const opcoes2 = document.getElementById("opcoes2");
+
+    let strength = 5;
+    let constituition = 1;
+    let spellLevel = 0;
+    let dexterity = 1;
+    let charisma = 1
+    let points = 0;
+    let playerLevel = 1;
+    let playerMaxHp = calculaMaxHp();
+    let playerHp = playerMaxHp;
+    let inventory = [];
+    let weaponAttack = (strength / 2) + playerLevel;
+    let currentMonster = null;
+    let selectedClass = ""; // Variável para armazenar a classe do jogador
+    let spentPoints = 0;
+    let item = "";
+   let expInterno = 0;
+const jogador = new Proxy({
+  get exp() {
+    return expInterno;
+  },
+  set exp(novoValor) {
+    expInterno = novoValor;
+    while (expInterno >= playerLevel * 15) {
+      expInterno -= playerLevel * 15;
+      playerLevel++;
+      playerMaxHp = calculaMaxHp();
+      if (playerHp > playerMaxHp) playerHp = playerMaxHp;
+    }
+    atualizarPontosPorNivel();
+  }
+}, {});
+
+
+    texto.innerHTML = "Você está em uma floresta misteriosa.";
+
+    // Função para calcular o HP máximo do jogador
+    function calculaMaxHp() {
+      return (playerLevel * 15) + ((constituition - 1) * 2) + 10; // Aumenta o HP com base na constituição
+    }
+    
+    function addCharisma() {
+      if (points > 0) {
+      points--;
+      spentPoints++;
+      charisma++;
+      if ((selectedClass === "bardo")||(selectedClass === "druida")) {
+        spellLevel = Math.floor(charisma/3)+1;
+      }
+      inventario();
+    }}
+
+    // Função para adicionar força
+    function addStrength() {
+      if (points > 0) {
+        points--;
+        spentPoints++;
+        strength++;
+        weaponAttack = (strength/ 2) + playerLevel;
+        inventario();
+      }
+    }
+
+    // Função para adicionar destreza
+    function addDexterity() {
+      if (points > 0) {
+        points--;
+        spentPoints++;
+        dexterity++;
+        if (selectedClass === "arqueiro") {
+          weaponAttack = (dexterity / 2) + playerLevel;
+        }
+        inventario();
+      }
+    }
+
+    // Função para adicionar constituição
+    function addConstituition() {
+      if (points > 0) {
+        points--;
+        spentPoints++;
+        constituition++;
+        
+        playerMaxHp = calculaMaxHp();
+        playerHp = playerMaxHp - (playerMaxHp - playerHp) + (playerHp / 2);
+        if (playerHp > playerMaxHp ) {
+          playerHp = playerMaxHp
+        }
+        
+        inventario();
+        
+      }
+    }
+
+    function start() {
+      if (!selectedClass) {
+      const classesDiv = document.createElement("div");
+
+      if (!document.getElementById("classesDiv")) {
+        // Cria a interface de seleção de classe, se não existir
+        classesDiv.innerHTML = `
+          <label for="classes">Selecione sua classe: 
+            <select id="classes" name="classes">
+              <option value="" disabled selected>Selecione sua classe</option>
+              <option value="mago">Mago</option>
+              <option value="lutador">Lutador</option>
+              <option value="arqueiro">Arqueiro</option>
+              <option value="bardo">Bardo
+                </option>
+              <option value="druida">Druida
+                </option>
+            </select>
+          </label>
+          <button id="selectButton" type="button">Selecione</button>
+        `;
+        document.body.appendChild(classesDiv);
+        classesDiv.setAttribute("id", "classesDiv");  // Atribuindo o id corretamente
+
+        // Adiciona ouvinte de eventos ao botão
+        const seletor = document.getElementById("selectButton");
+        
+        seletor.addEventListener("click", select);
+      }
+}
+      // Mostra o menu e esconde o botão de início
+      document.getElementById("menu").classList.remove("hidden");
+      document.getElementById("start").classList.add("hidden");
+    }
+
+    // Função para selecionar a classe
+ function select() {
+  const seletor = document.getElementById("selectButton");
+  selectedClass = document.getElementById("classes").value;
+
+  if (!selectedClass) {
+    alert("Por favor, selecione uma classe antes de continuar.");
+    return;
+  }
+
+  if (selectedClass === "mago") {
+    spellLevel++;
+    dexterity += 4;
+  } else if (selectedClass === "lutador") {
+    constituition += 5;
+  } else if (selectedClass === "arqueiro") {
+    dexterity += 5;
+    weaponAttack = (dexterity / 2) + playerLevel;
+  } else if (selectedClass === "bardo") {
+    charisma += 5;
+    spellLevel = Math.floor(charisma / 2) + 1;
+  } else if (selectedClass === "druida") {
+    charisma += 5;
+    spellLevel = Math.floor(charisma / 3) + 1;
+  }
+
+  document.getElementById("classesDiv").classList.add("hidden");
+  texto.innerHTML = `Você escolheu a classe ${selectedClass}.`;
+  inventario();
+  seletor.disabled = true;
+}
+
+
+    // Função para explorar e gerar um monstro
+    function explorar() {
+    let chances = Math.floor(Math.random() * 3) + 1
+    switch (chances) {
+      case 1: if (!currentMonster) {
+      gerarMonstro();
+    }
+    texto.innerHTML = `Você encontra um monstro! Nível: ${currentMonster.level}, HP: ${currentMonster.hp}.`;
+
+    esconderTodosOsMenus();
+    document.getElementById("opcoes").classList.remove("hidden");
+    break;
+    
+    case 2: adicionarDrop(); texto.innerHTML = `Você encontra um item: ${item}`; break;
+    
+    case 3: esconderTodosOsMenus();
+    document.getElementById("menu2").classList.remove("hidden"); texto.innerHTML = "Você encontra uma passagem entre as árvores."; break;
+     }
+    }
+
+
+    function abrigo() {
+      texto.innerHTML = "Você encontrou um abrigo numa caverna próxima. Você descansa num lugar seguro."
+      playerHp = playerMaxHp;
+      inventario();
+    }
+
+    // Função para gerar o monstro
+    function gerarMonstro() {
+      let monsterLevel = Math.floor(Math.random() * 50) + 1;
+      currentMonster = {
+        level: monsterLevel,
+        maxHp: monsterLevel * 25,
+        hp: monsterLevel * 25
+      };
+    }
+
+    // Função para combater o monstro
+    function combater() {
+      if (!currentMonster) {
+        texto.innerHTML = "Não há nenhum monstro para combater.";
+        return;
+      }
+      let resultado = Math.floor(Math.random() * 20 + (((dexterity - 1) / 4) - (currentMonster.level / 5))) + 1;
+      if (selectedClass === "arqueiro") {
+        resultado = Math.floor(Math.random() * 20 + ((dexterity / 2) - (currentMonster.level / 5))) + 1;
+      }
+
+      if (resultado > 10) {
+        let attackDamage = weaponAttack + 1;
+        currentMonster.hp -= attackDamage;
+        texto.innerHTML = `Você causou ${attackDamage} de dano no monstro. HP do monstro restante: ${currentMonster.hp}.`;
+
+        if (currentMonster.hp <= 0) {
+        document.getElementById("opcoes").innerHTML += "<br>Você derrotou o monstro!";
+        jogador.exp += Math.floor(currentMonster.level / 2) + 1;
+        atualizarPontosPorNivel();
+        adicionarDrop();
+
+        // Manipulação de menus
+        document.getElementById("opcoes").classList.add("hidden");
+        document.getElementById("menu2").classList.remove("hidden");
+        document.getElementById("menu").classList.add("hidden");
+        
+        currentMonster = null; // O monstro é derrotado.
+    }   
+        } else if (resultado < 5) {
+        playerHp -= currentMonster.level;
+        texto.innerHTML = `O monstro te atacou! Causou ${currentMonster.level} de dano. Vida atual: ${playerHp}.`;
+        if (playerHp <= 0) {
+          texto.innerHTML = "Você foi derrotado! Fuja para sobreviver.";
+          esconderTodosOsMenus();
+          document.getElementById("menu").classList.remove("hidden");
+        }
+      } else {
+        texto.innerHTML = "O monstro desviou do seu ataque!";
+      }
+      atualizarInventario();
+    }
+
+    function fugir() {
+      texto.innerHTML = "Você fugiu para a floresta e se escondeu.";
+      currentMonster = null;
+      esconderTodosOsMenus();
+      document.getElementById("menu").classList.remove("hidden");
+    }
+
+    // Função para adicionar itens ao inventário
+    function adicionarDrop() {
+  const dropChance = Math.floor(Math.random() * 100) + 1;
+  let raridade = "";
+
+  if (dropChance <= 15) {
+    item = "Espada (+2 Força)";
+    strength += 2;
+    raridade = "Comum";
+    texto.innerHTML += "Você encontrou uma espada."
+
+  } else if (dropChance <= 25) {
+    item = "Capa (+1 Magia)";
+    spellLevel++;
+    raridade = "Comum";
+    texto.innerHTML += "Você encontrou uma capa."
+
+  } else if (dropChance <= 35) {
+    item = "Cajado (+2 Magia)";
+    spellLevel += 2;
+    raridade = "Incomum";
+    texto.innerHTML += "Você encontrou um cajado."
+
+  } else if (dropChance <= 50) {
+    item = "Botas (+1 Destreza)";
+    dexterity++;
+    raridade = "Comum";
+
+  } else if (dropChance <= 52) {
+    item = "Tomos Antigos (+4 Magia)";
+    spellLevel += 4;
+    raridade = "Raro";
+    texto.innerHTML += "Você encontrou tomos de magos antigos!"
+
+  } else if (dropChance <= 62) {
+    item = "Lança (+4 Força)";
+    strength += 4;
+    raridade = "Incomum";
+    texto.innerHTML += "Você encontrou uma lança!"
+
+  } else if (dropChance < 72) {
+    item = "Capuz (+2 Destreza)";
+    dexterity += 2;
+    raridade = "Incomum";
+    texto.innerHTML += "Você encontrou um capuz."
+
+  } else if (dropChance <= 73) {
+    item = "Orbe (+10 Magia)";
+    spellLevel += 10;
+    raridade = "Lendário";
+    texto.innerHTML += "Você encontrou um orbe! Parabéns!"
+
+  } else if (dropChance <= 83) {
+    item = "Shield (+2 Constituição)";
+    constituition += 2;
+    playerMaxHp = calculaMaxHp();
+    raridade = "Incomum";
+    texto.innerHTML += "Você conseguiu um escudo."
+  } else {
+    texto.innerHTML += "Ele apenas desapareceu."
+  }
+
+  // Aqui é onde fizemos a modificação
+  const itemComRaridade = `<span class="${raridade.toLowerCase()}">${item} [${raridade}]</span>`;
+  inventory.push(itemComRaridade);
+  inventario();
+}
+
+
+
+    // Função para atualizar o inventário
+    function atualizarInventario() {
+      inventario();
+    }
+
+    // Função de magias
+    function inventario() {
+  const existingInventory = document.getElementById("inventory");
+  
+  if (!existingInventory) {
+    // Cria o div do inventário caso não exista
+    const invDiv = document.createElement("div");
+    invDiv.id = "inventory"; // Atribui um id para verificar a existência no futuro
+    invDiv.classList.add("column");
+    document.body.appendChild(invDiv);
+  }
+
+  // Atualiza o conteúdo do inventário
+  let invDiv = document.getElementById("inventory");
+  invDiv.innerHTML = `
+    <h3>Inventário:</h3>
+    <p>Nivel: ${playerLevel}</p>
+    <p>Itens: ${inventory.join(", ") || "Nenhum item"}</p>
+    <p>Força: ${strength}</p><button onclick="addStrength()">+</button>
+    <p>Destreza: ${dexterity}</p><button onclick="addDexterity()">+</button>
+    <p>Constituição: ${constituition}</p><button onclick="addConstituition()">+</button>
+    <p>Carisma: ${charisma}</p><button onclick="addCharisma()">+</button>
+    <p>Magia: ${spellLevel}</p>
+    <p>Pontos disponíveis: ${points}</p>
+    <p>Vida: ${playerHp} / ${playerMaxHp}</p>
+  `;
+}
+
+
+    
+    function magias() {
+      if (document.getElementById("magiasDiv")) {
+        document.getElementById("magiasDiv").remove();
+      }
+      const magiasDiv = document.createElement("div");
+      magiasDiv.id = "magiasDiv";
+      magiasDiv.innerHTML = `
+        <label for="magias">Escolha uma magia:</label>
+        <select name="magias" id="magias">
+          <option value="MissilMagico">Míssil mágico (Lvl. 1)</option>
+          <option value="BolaDeFogo">Bola de Fogo (Lvl. 20)</option>
+          <option value="FimEterno">Fim Eterno (Lvl. 50)</option>
+          <option value="BaladaDeLuz">Balada de Luz (Lvl. 1)</option>
+          <option value="Caos">Caos (Lvl. 40)</option>
+        </select>
+        <button onclick="cast()">Lançar Magia</button>`;
+      document.getElementById("interface").appendChild(magiasDiv);
+    }
+    
+    function cast() {
+      if (!currentMonster) {
+      texto.innerHTML = "Não há nenhum monstro para usar magia.";
+      return;
+    } else {
+      const magia = document.getElementById("magias").value;
+      let dano = 0;
+      let resultado = Math.floor((Math.random()* 20) + (dexterity / 4) - (currentMonster.level / 15)) + 1
+      if ((magia === "MissilMagico") && (spellLevel >= 1)) {
+    dano = spellLevel*5 + 5;
+  } else if ((magia === "BolaDeFogo") && (spellLevel >= 20) && (selectedClass === 'mago')) {
+    dano = Math.floor(((currentMonster.hp - 5) / 9) + spellLevel * 2) + 2;
+  } else if ((magia === "FimEterno") && (spellLevel >= 50) && (selectedClass === 'mago')) {
+    dano = Math.floor((currentMonster.hp / 2) + spellLevel * 5) + 5;
+  } else if ((magia === "BaladaDeLuz") && (spellLevel >= 1) && (selectedClass === 'bardo')) {
+    dano = spellLevel*2 +10;
+  } else if ((magia === "Caos") && (spellLevel>= 40) && (selectedClass === 'bardo')) {
+    let chosenNo = Math.floor(Math.random() * 3) + 1;
+    switch (chosenNo) {
+      case 1: dano = spellLevel * 25 + (Math.floor(currentMonster.hp/10) + 1);
+        break
+      
+      case 2: dano = spellLevel * 50 + (Math.floor(currentMonster.hp/5)+1)
+        break
+      
+      case 3: playerHp -= Math.min(playerHp - 1, spellLevel * 5 + 20);
+        break 
+    }
+  }
+      if (currentMonster) { if (resultado > 8) {
+         currentMonster.hp -= dano;
+         playerHp += Math.floor(dano*2/3)+1;
+         if (playerHp > playerMaxHp) {
+    playerHp = playerMaxHp;
+    }
+        texto.innerHTML = `Você usou ${magia} causando ${dano} de dano no monstro. Vida do monstro: ${currentMonster.hp}`;
+        
+        } else {
+          let monsterDmg = Math.floor(5 + (currentMonster.level / 10)) + 1;
+          playerHp-= monsterDmg;
+          texto.innerHTML = `Você errou! O monstro contra-ataca: ${monsterDmg} de dano recebido. Vida atual: ${playerHp}`
+          if (playerHp <= 0) {
+            texto.innerHTML ="O monstro te derrotou! Você fugiu para a floresta."
+          esconderTodosOsMenus();
+          document.getElementById("menu").classList.remove("hidden");
+          }
+        }
+        
+        if ((currentMonster.hp <= 0) && (selectedClass !== 'bardo' && selectedClass !== 'druida')) {
+          texto.innerHTML += "<br>Você derrotou o monstro com magia!";
+          jogador.exp += Math.floor(currentMonster.level / 2) + 1;
+          atualizarPontosPorNivel();
+          spellLevel++;
+    if (selectedClass === "mago") {
+
+    spellLevel += 4;  // Incrementa o nível de magia
+      // Atualiza os atributos do jogador
+  }
+        adicionarDrop();
+          currentMonster = null;
+          opcoes.classList.add("hidden");
+          document.getElementById("menu").classList.add("hidden");
+          document.getElementById("menu2").classList.remove("hidden");
+          magiasDiv.classList.add("hidden");
+          
+        } else if (currentMonster.hp <= 0 && (selectedClass === 'bardo' || selectedClass === 'druida')) {
+          texto.innerHTML += "<br>Você derrotou o monstro com magia!";
+          jogador.exp += Math.floor(currentMonster.level / 2) + 1;
+          atualizarPontosPorNivel();
+          adicionarDrop();
+          currentMonster = null;
+          opcoes.classList.add("hidden");
+          document.getElementById("menu").classList.add("hidden");
+          document.getElementById("menu2").classList.remove("hidden");
+          magiasDiv.classList.add("hidden");
+          
+        }
+      }
+      atualizarInventario();
+    }
+  }
+  
+  function zona2() {
+    texto.innerHTML = "Você encontra uma passagem entre as árvores rumo ao oeste."
+ esconderTodosOsMenus();
+ document.getElementById("zona2").classList.remove("hidden");
+  }
+  
+   function abrigo2() {
+      texto.innerHTML = "Você encontrou um abrigo numa árvore oca. Você descansa num lugar seguro."
+      playerHp = playerMaxHp;
+      inventario(); }
+      
+    function gerarMonstro2() {
+      let monsterLevel = Math.floor(Math.random() * 100) + 50;
+      currentMonster = {
+        level: monsterLevel,
+        maxHp: monsterLevel * 50,
+        hp: monsterLevel * 50
+      };
+    }
+    
+    function fugir2() {
+      texto.innerHTML = "Você fugiu para a floresta e se escondeu.";
+      currentMonster = null;
+      esconderTodosOsMenus();
+      
+      document.getElementById("menu2").classList.remove("hidden");
+    }
+
+  
+    function cast2() {
+      if (!currentMonster) {
+      texto.innerHTML = "Não há nenhum monstro para usar magia.";
+      return;
+    } else {
+      const magia2 = document.getElementById("magias2").value;
+      let dano = 0;
+      let resultado = Math.floor((Math.random()* 20) + (dexterity / 4) - (currentMonster.level / 15)) + 1
+      if ((magia2 === "MissilMagico") && (spellLevel >= 1)) {
+    dano = spellLevel*5 + 5;
+  } else if ((magia2 === "BolaDeFogo") && (spellLevel >= 20) && (selectedClass === 'mago')) {
+    dano = Math.floor(((currentMonster.hp - 5) / 9) + spellLevel * 2) + 2;
+  } else if ((magia2 === "FimEterno") && (spellLevel >= 50) && (selectedClass === 'mago')) {
+    dano = Math.floor((currentMonster.hp / 2) + spellLevel * 5) + 5;
+  } else if ((magia2 === "BaladaDeLuz") && (spellLevel >= 1) && (selectedClass === 'bardo')) {
+    dano = spellLevel*2 +10;
+    
+  } else if ((magia2 === "Caos") && (spellLevel>= 40) && (selectedClass === 'bardo')) {
+    let chosenNo = Math.floor(Math.random() * 3) + 1;
+    switch (chosenNo) {
+      case 1: dano = spellLevel * 25 + (Math.floor(currentMonster.hp/10) + 1);
+        break
+      
+      case 2: dano = spellLevel * 50 + (Math.floor(currentMonster.hp/5)+1)
+        break
+      
+      case 3: playerHp -= Math.min(playerHp - 1, spellLevel * 5 + 20);
+        break
+    }
+  }
+      if (currentMonster) { if (resultado > 8) {
+         currentMonster.hp -= dano;
+         playerHp += Math.floor(dano*2/3)+1;
+         if (playerHp > playerMaxHp) {
+    playerHp = playerMaxHp;
+    }
+        texto.innerHTML = `Você usou ${magia2} causando ${dano} de dano no monstro. Vida do monstro: ${currentMonster.hp}`;
+        
+        } else {
+          let monsterDmg = Math.floor(5 + (currentMonster.level / 10)) + 1;
+          playerHp-= monsterDmg;
+          texto.innerHTML = `Você errou! O monstro contra-ataca: ${monsterDmg} de dano recebido. Vida atual: ${playerHp}`
+          if (playerHp <= 0) {
+            texto.innerHTML ="O monstro te derrotou! Você fugiu para a floresta."
+          esconderTodosOsMenus();
+          document.getElementById("menu2").classList.remove("hidden");
+          }
+        }
+        
+        if ((currentMonster.hp <= 0) && (selectedClass !== 'bardo' && selectedClass !== 'druida')) {
+          texto.innerHTML += "<br>Você derrotou o monstro com magia!";
+          jogador.exp += Math.floor(currentMonster.level / 2) + 1;
+          atualizarPontosPorNivel();
+          spellLevel++;
+    if (selectedClass === "mago") {
+
+    spellLevel += 4;  // Incrementa o nível de magia
+      // Atualiza os atributos do jogador
+  }
+        adicionarDrop();
+          currentMonster = null;
+          opcoes.classList.add("hidden");
+          document.getElementById("menu").classList.add("hidden");
+          document.getElementById("menu2").classList.remove("hidden");
+          magiasDiv.classList.add("hidden");
+          
+        } else if (currentMonster.hp <= 0 && (selectedClass==='bardo' || selectedClass==='druida')) {
+          texto.innerHTML += "<br>Você derrotou o monstro com magia!";
+          jogador.exp += Math.floor(currentMonster.level / 2) + 1;
+          atualizarPontosPorNivel();
+          adicionarDrop();
+          currentMonster = null;
+          opcoes.classList.add("hidden");
+          document.getElementById("menu").classList.add("hidden");
+          document.getElementById("menu2").classList.remove("hidden");
+          magiasDiv.classList.add("hidden");
+          
+        }
+      }
+      atualizarInventario();
+    }
+  }
+
+    
+    function magias2() {
+      if (document.getElementById("magiasDiv2")) {
+        document.getElementById("magiasDiv2").remove();
+      }
+      const magiasDiv2 = document.createElement("div");
+      magiasDiv2.id = "magiasDiv2";
+      magiasDiv2.innerHTML = `
+        <label for="magias">Escolha uma magia:</label>
+        <select name="magias" id="magias2">
+          <option value="MissilMagico">Míssil mágico (Lvl. 1)</option>
+          <option value="BolaDeFogo">Bola de Fogo (Lvl. 20)</option>
+          <option value="FimEterno">Fim Eterno (Lvl. 50)</option>
+          <option value="BaladaDeLuz">Balada de Luz (Lvl. 1)</option>
+          <option value="Caos">Caos (Lvl. 40)</option>
+        </select>
+        <button onclick="cast2()">Lançar Magia</button>`;
+      document.getElementById("interface").appendChild(magiasDiv2);
+    }
+    
+  // Função para esconder todos os menus
+  function esconderTodosOsMenus() {
+    document.getElementById("menu").classList.add("hidden");
+    document.getElementById("menu2").classList.add("hidden");
+    document.getElementById("zona2").classList.add("hidden");
+    document.getElementById("opcoes").classList.add("hidden");
+    document.getElementById("opcoes2").classList.add("hidden");
+  }
+
+  // Modificação na função 'combater'
+  function combater2() {
+    if (!currentMonster) {
+      texto.innerHTML = "Não há nenhum monstro para combater.";
+      return;
+    }
+
+    const resultado = Math.floor(Math.random() * 20 + ((dexterity - 1) / 4) - (currentMonster.level / 5)) + 1;
+
+    if (resultado > 10) {
+      let attackDamage = weaponAttack + 1;
+      currentMonster.hp -= attackDamage;
+      texto.innerHTML = `Você causou ${attackDamage} de dano no monstro. HP do monstro restante: ${currentMonster.hp}.`;
+
+      if (currentMonster.hp <= 0) {
+        texto.innerHTML += "<br>Você derrotou o monstro!";
+        jogador.exp += Math.floor(currentMonster.level / 2) + 1;
+        atualizarPontosPorNivel();
+        adicionarDrop();
+
+        // Atualiza a exibição dos menus após derrotar o monstro
+        esconderTodosOsMenus();
+        zona2();
+
+        currentMonster = null; // O monstro é derrotado.
+      }
+    } else if (resultado < 5) {
+      playerHp -= currentMonster.level;
+      texto.innerHTML = `O monstro te atacou! Causou ${currentMonster.level} de dano. Vida atual: ${playerHp}.`;
+      if (playerHp <= 0) {
+        texto.innerHTML = "Você foi derrotado! Fuja para sobreviver.";
+        esconderTodosOsMenus();
+        document.getElementById("menu2").classList.remove("hidden");
+      }
+    } else {
+      texto.innerHTML = "O monstro desviou do seu ataque!";
+    }
+    atualizarInventario();
+  }
+
+  // Modificação na função 'zona2'
+
+  // Modificação na função 'explorar2'
+  function explorar2() {
+    let chances = Math.floor(Math.random() * 3) + 1
+    switch (chances) {
+    case 1:
+        if (!currentMonster) {
+      gerarMonstro2();
+    }
+    texto.innerHTML = `Você encontra um monstro! Nível: ${currentMonster.level}, HP: ${currentMonster.hp}.`;
+    esconderTodosOsMenus();
+    document.getElementById("opcoes2").classList.remove("hidden");
+    break;
+    
+    case 2: adicionarDrop(); break;
+    
+    case 3: texto.innerHTML = "Você se perdeu!"; break;
+    }
+    
+  }
+
+  // Modificação na função 'retornar'
+  function retornar() {
+    esconderTodosOsMenus();
+    document.getElementById("menu").classList.remove("hidden");
+  }
+  
+  // Função para atualizar os pontos com base no nível do jogador
+function atualizarPontosPorNivel() {
+  // Calcula quantos conjuntos de 5 níveis o jogador alcançou
+  const niveisDeBonus = Math.floor(playerLevel / 5);
+
+  // Atualiza os pontos, garantindo que não sejam negativos
+  const maxPoints = Math.max(0, niveisDeBonus * 3);
+  points = Math.max(0, maxPoints - spentPoints);
+
+  // Exibe os pontos atualizados no inventário
+  inventario();
+}
+function salvarPersonagem() {
+  fetch('http://localhost:7700/salvar', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    id: 'default',
+    strength,
+    constituition,
+    spellLevel,
+    dexterity,
+    playerLevel,
+    inventory,
+    selectedClass
+  })
+})
+.then(res => res.json())
+.then(data => console.log("Resposta do servidor:", data))
+.catch(err => console.error("Erro ao salvar:", err));
+}
+
+
+function carregarPersonagem() {
+  fetch('http://localhost:7700/carregar/default') // ou coloque o ID se tiver
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Erro ao carregar personagem.");
+      }
+      return response.json();
+    })
+    .then(personagem => {
+      playerLevel = personagem.playerLevel ?? playerLevel;
+      playerMaxHp = personagem.playerMaxHp ?? calculaMaxHp();
+      playerHp = personagem.playerHp ?? playerMaxHp;
+      jogador.exp = personagem.exp ?? jogador.exp;
+
+      strength = personagem.strength ?? strength;
+      constituition = personagem.constituition ?? constituition;
+      dexterity = personagem.dexterity ?? dexterity;
+      charisma = personagem.charisma ?? charisma;
+      points = personagem.points ?? points;
+      inventory = personagem.inventory ?? inventory;
+      selectedClass = personagem.selectedClass ?? selectedClass;
+
+      playerMaxHp = calculaMaxHp(); // Recalcula para garantir consistência
+      weaponAttack = (selectedClass === "arqueiro")
+        ? (dexterity / 2) + playerLevel
+        : (strength / 2) + playerLevel;
+
+      atualizarPontosPorNivel();
+      inventario(); // Atualiza a interface
+    })
+    .catch(error => {
+      console.error("Erro ao carregar personagem:", error);
+    });
+}
+
+
+
+function clear()
+{
+  localStorage.clear()
+}
+
+</script>
+
+</body>
+
+</html>
